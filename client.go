@@ -788,6 +788,20 @@ func (c *Client) ReleaseLock(lockItem *Lock, opts ...ReleaseLockOption) (bool, e
 	return err == nil, err
 }
 
+func (c *Client) ReleaseLockSkipCheck(lockItem *Lock, opts ...ReleaseLockOption) (bool, error) {
+	releaseLockOptions := &releaseLockOptions{
+		lockItem: lockItem,
+	}
+	if lockItem != nil {
+		releaseLockOptions.deleteLock = lockItem.deleteLockOnRelease
+	}
+	for _, opt := range opts {
+		opt(releaseLockOptions)
+	}
+	err := c.releaseLock(releaseLockOptions)
+	return err == nil, err
+}
+
 // WithDeleteLock defines whether or not to delete the lock when releasing it.
 // If set to false, the lock row will continue to be in DynamoDB, but it will be
 // marked as released.
@@ -889,7 +903,7 @@ func (c *Client) releaseLock(options *releaseLockOptions) error {
 func (c *Client) releaseAllLocks() error {
 	var err error
 	c.locks.Range(func(key interface{}, value interface{}) bool {
-		_, err = c.ReleaseLock(value.(*Lock))
+		_, err = c.ReleaseLockSkipCheck(value.(*Lock))
 		return err == nil
 	})
 	return err
