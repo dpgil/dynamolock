@@ -105,7 +105,7 @@ type Client struct {
 
 	stopHeartbeat context.CancelFunc
 
-	mu        sync.Mutex
+	mu        sync.RWMutex
 	closeOnce sync.Once
 	closed    bool
 }
@@ -294,6 +294,15 @@ func (c *Client) AcquireLock(key string, opts ...AcquireLockOption) (*Lock, erro
 }
 
 func (c *Client) acquireLock(opt *acquireLockOptions) (*Lock, error) {
+	// Hold the read lock when acquiring locks. This prevents us from
+	// acquiring a lock while the Client is being closed as we hold the
+	// write lock during close.
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.closed {
+		return nil, ErrClientClosed
+	}
+
 	attrs := opt.additionalAttributes
 	contains := func(ks ...string) bool {
 		for _, k := range ks {
@@ -934,24 +943,23 @@ func (c *Client) Get(key string) (*Lock, error) {
 var ErrClientClosed = errors.New("client already closed")
 
 func (c *Client) isClosed() bool {
-	c.mu.Lock()
+	c.mu.RLock()
 	closed := c.closed
-	c.mu.Unlock()
+	c.mu.RUnlock()
 	return closed
 }
 
 // Close releases all of the locks.
 func (c *Client) Close() error {
-	if c.isClosed() {
-		return ErrClientClosed
-	}
 	err := ErrClientClosed
 	c.closeOnce.Do(func() {
+		// Hold the write lock for the duration of the close operation
+		// to prevent new locks from being acquired.
+		c.mu.Lock()
+		defer c.mu.Unlock()
 		err = c.releaseAllLocks()
 		c.stopHeartbeat()
-		c.mu.Lock()
 		c.closed = true
-		c.mu.Unlock()
 	})
 	return err
 }
