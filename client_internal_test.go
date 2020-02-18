@@ -111,7 +111,7 @@ func TestCloseRace(t *testing.T) {
 
 	wg.Wait()
 
-	t.Fatal("lox="+strconv.Itoa(length2))
+	//t.Fatal("lox="+strconv.Itoa(length2))
 
 	// TODO: Close the lock client
 	wg.Add(1)
