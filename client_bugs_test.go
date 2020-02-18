@@ -17,6 +17,7 @@ limitations under the License.
 package dynamolock_test
 
 import (
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	"sync"
 	"testing"
 	"time"
@@ -26,6 +27,40 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"golang.org/x/xerrors"
 )
+
+type mockDynamoDBClient struct {
+	dynamodbiface.DynamoDBAPI
+}
+func (m *mockDynamoDBClient) PutItem(input *dynamodb.PutItemInput) (*dynamodb.PutItemOutput, error) {
+	// TODO: Implement mock
+	return &dynamodb.PutItemOutput{}, nil
+}
+func (m *mockDynamoDBClient) GetItem(input *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
+	// TODO: Implement mock
+	return &dynamodb.GetItemOutput{}, nil
+}
+func (m *mockDynamoDBClient) DeleteItem(input *dynamodb.DeleteItemInput) (*dynamodb.DeleteItemOutput, error) {
+	// TODO: Implement mock
+	return &dynamodb.DeleteItemOutput{}, nil
+}
+
+func TestCloseRace(t *testing.T) {
+	mockSvc := &mockDynamoDBClient{}
+	// TODO: Most of the input into New isn't relevant since we're mocking
+	_, err := dynamolock.New(mockSvc, "locksCloseRace",
+		dynamolock.WithLeaseDuration(3*time.Second),
+		dynamolock.WithHeartbeatPeriod(100*time.Millisecond),
+		dynamolock.WithOwnerName("CloseRace"),
+		dynamolock.WithPartitionKeyName("key"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// TODO: Create a ton of goroutines that acquire a lock
+	// TODO: Close the lock client
+	// TODO: Check for any leaked locks
+}
 
 func TestIssue56(t *testing.T) {
 	isDynamoLockAvailable(t)
