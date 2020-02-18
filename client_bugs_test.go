@@ -17,115 +17,83 @@ limitations under the License.
 package dynamolock_test
 
 import (
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"golang.org/x/xerrors"
+	"sync"
 	"testing"
 	"time"
 
 	"cirello.io/dynamolock"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
-type mockDynamoDBClient struct {
-	dynamodbiface.DynamoDBAPI
-}
-func (m *mockDynamoDBClient) PutItem(input *dynamodb.PutItemInput) (*dynamodb.PutItemOutput, error) {
-	// TODO: Implement mock
-	return &dynamodb.PutItemOutput{}, nil
-}
-func (m *mockDynamoDBClient) GetItem(input *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
-	// TODO: Implement mock
-	return &dynamodb.GetItemOutput{}, nil
-}
-func (m *mockDynamoDBClient) DeleteItem(input *dynamodb.DeleteItemInput) (*dynamodb.DeleteItemOutput, error) {
-	// TODO: Implement mock
-	return &dynamodb.DeleteItemOutput{}, nil
-}
-
-func TestCloseRace(t *testing.T) {
-	mockSvc := &mockDynamoDBClient{}
-	// TODO: Most of the input into New isn't relevant since we're mocking
-	_, err := dynamolock.New(mockSvc, "locksCloseRace",
+func TestIssue56(t *testing.T) {
+	isDynamoLockAvailable(t)
+	t.Parallel()
+	svc := dynamodb.New(mustAWSNewSession(t), &aws.Config{
+		Endpoint: aws.String("http://localhost:8000/"),
+		Region:   aws.String("us-west-2"),
+	})
+	lockClient, err := dynamolock.New(svc,
+		"locksIssue56",
 		dynamolock.WithLeaseDuration(3*time.Second),
 		dynamolock.WithHeartbeatPeriod(100*time.Millisecond),
-		dynamolock.WithOwnerName("CloseRace"),
+		dynamolock.WithOwnerName("TestIssue56"),
 		dynamolock.WithPartitionKeyName("key"),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	lockClient.CreateTable("locksIssue56",
+		dynamolock.WithProvisionedThroughput(&dynamodb.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(5),
+			WriteCapacityUnits: aws.Int64(5),
+		}),
+		dynamolock.WithCustomPartitionKeyName("key"),
+	)
 
-	// TODO: Create a ton of goroutines that acquire a lock
-	// TODO: Close the lock client
-	// TODO: Check for any leaked locks
+	var (
+		wg    sync.WaitGroup
+		count = 0
+	)
+
+	const (
+		expectedTimeoutMinimumAge = 15 * time.Second
+		expectedCount             = 100
+	)
+
+	for i := 0; i < expectedCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				lock, err := lockClient.AcquireLock(
+					"key",
+					dynamolock.WithAdditionalTimeToWaitForLock(expectedTimeoutMinimumAge),
+					dynamolock.WithRefreshPeriod(100*time.Millisecond),
+				)
+				switch err {
+				case nil:
+					count++
+					lockClient.ReleaseLock(lock)
+					return
+				default:
+					var errTimeout *dynamolock.TimeoutError
+					if !xerrors.As(err, &errTimeout) {
+						t.Error("unexpected error:", err)
+						return
+					}
+					if errTimeout.Age < expectedTimeoutMinimumAge {
+						t.Error("timeout happened too fast:", errTimeout.Age)
+						return
+					}
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	if count != expectedCount {
+		t.Fatal("did not achieve expected count:", count)
+	}
 }
-
-//func TestIssue56(t *testing.T) {
-//	isDynamoLockAvailable(t)
-//	t.Parallel()
-//	svc := dynamodb.New(mustAWSNewSession(t), &aws.Config{
-//		Endpoint: aws.String("http://localhost:8000/"),
-//		Region:   aws.String("us-west-2"),
-//	})
-//	lockClient, err := dynamolock.New(svc,
-//		"locksIssue56",
-//		dynamolock.WithLeaseDuration(3*time.Second),
-//		dynamolock.WithHeartbeatPeriod(100*time.Millisecond),
-//		dynamolock.WithOwnerName("TestIssue56"),
-//		dynamolock.WithPartitionKeyName("key"),
-//	)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	lockClient.CreateTable("locksIssue56",
-//		dynamolock.WithProvisionedThroughput(&dynamodb.ProvisionedThroughput{
-//			ReadCapacityUnits:  aws.Int64(5),
-//			WriteCapacityUnits: aws.Int64(5),
-//		}),
-//		dynamolock.WithCustomPartitionKeyName("key"),
-//	)
-//
-//	var (
-//		wg    sync.WaitGroup
-//		count = 0
-//	)
-//
-//	const (
-//		expectedTimeoutMinimumAge = 15 * time.Second
-//		expectedCount             = 100
-//	)
-//
-//	for i := 0; i < expectedCount; i++ {
-//		wg.Add(1)
-//		go func() {
-//			defer wg.Done()
-//			for {
-//				lock, err := lockClient.AcquireLock(
-//					"key",
-//					dynamolock.WithAdditionalTimeToWaitForLock(expectedTimeoutMinimumAge),
-//					dynamolock.WithRefreshPeriod(100*time.Millisecond),
-//				)
-//				switch err {
-//				case nil:
-//					count++
-//					lockClient.ReleaseLock(lock)
-//					return
-//				default:
-//					var errTimeout *dynamolock.TimeoutError
-//					if !xerrors.As(err, &errTimeout) {
-//						t.Error("unexpected error:", err)
-//						return
-//					}
-//					if errTimeout.Age < expectedTimeoutMinimumAge {
-//						t.Error("timeout happened too fast:", errTimeout.Age)
-//						return
-//					}
-//				}
-//			}
-//		}()
-//	}
-//
-//	wg.Wait()
-//	if count != expectedCount {
-//		t.Fatal("did not achieve expected count:", count)
-//	}
-//}
