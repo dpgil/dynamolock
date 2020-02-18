@@ -67,13 +67,7 @@ func TestCloseRace(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			l, err := lockClient.AcquireLock(strconv.Itoa(si))
-			if err != nil {
-				t.Fatal("error acquiring lock" + err.Error())
-			}
-			if l == nil {
-				t.Fatal("no error but no lock")
-			}
+			lockClient.AcquireLock(strconv.Itoa(si))
 		}()
 	}
 
