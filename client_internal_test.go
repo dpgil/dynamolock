@@ -17,14 +17,14 @@ limitations under the License.
 package dynamolock
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
 	"runtime"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 )
 
 type mockDynamoDBClient struct {
@@ -53,6 +53,7 @@ func TestCloseRace(t *testing.T) {
 		WithOwnerName("CloseRace"),
 		WithPartitionKeyName("key"),
 	)
+	//lockClient := &Client{}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,12 +84,21 @@ func TestCloseRace(t *testing.T) {
 	// TODO: Check for any leaked locks
 	wg.Wait()
 
-	for i := 0; i < n; i++ {
-		l, _ := lockClient.Get(string(i))
-		if l != nil {
-			t.Fatal("Leaked lock")
-		}
-	}
+	length := 0
+
+	lockClient.locks.Range(func(_, _ interface{}) bool {
+		length++
+
+		return true
+	})
+
+	t.Fatal("we have this many lox: " + strconv.Itoa(length))
+	//for i := 0; i < n; i++ {
+	//	l, _ := lockClient.Get(string(i))
+	//	if l != nil {
+	//		t.Fatal("Leaked lock")
+	//	}
+	//}
 }
 
 func TestBadCreateLockItem(t *testing.T) {
