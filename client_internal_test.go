@@ -93,15 +93,16 @@ func TestCloseRace(t *testing.T) {
 			if l == nil {
 				t.Fatal("no error but no lock")
 			}
-			t.Fatal("unique id: " + l.uniqueIdentifier())
+			//t.Fatal("unique id: " + l.uniqueIdentifier())
 		}()
 	}
+
+	wg.Wait()
 
 	wg.Add(1)
 	length2 := 0
 	go func() {
 		defer wg.Done()
-		length2 := 0
 		lockClient.locks.Range(func(_, _ interface{}) bool {
 			length2++
 			return true
