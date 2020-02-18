@@ -17,10 +17,10 @@ limitations under the License.
 package dynamolock
 
 import (
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbiface"
-	"runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -58,8 +58,7 @@ func TestCloseRace(t *testing.T) {
 		t.Fatal(err)
 	}
 	var wg sync.WaitGroup
-	n := runtime.NumCPU()
-	//n := 100
+	n := 100
 
 	// Create goroutines that acquire a lock
 	for i := 0; i < n; i++ {
@@ -83,12 +82,11 @@ func TestCloseRace(t *testing.T) {
 	length := 0
 	lockClient.locks.Range(func(_, _ interface{}) bool {
 		length++
-
 		return true
 	})
 
 	if length > 0 {
-		t.Fatal("lock client still has " + strconv.Itoa(length) + " locks after Close()")
+		t.Fatal(fmt.Sprintf("lock client still has %d locks after Close()", length))
 	}
 }
 
