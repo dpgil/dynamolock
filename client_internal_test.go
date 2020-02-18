@@ -42,10 +42,6 @@ func (m *mockDynamoDBClient) UpdateItem(input *dynamodb.UpdateItemInput) (*dynam
 	// TODO: Implement mock
 	return &dynamodb.UpdateItemOutput{}, nil
 }
-//func (m *mockDynamoDBClient) DeleteItem(input *dynamodb.DeleteItemInput) (*dynamodb.DeleteItemOutput, error) {
-//	// TODO: Implement mock
-//	return &dynamodb.DeleteItemOutput{}, nil
-//}
 
 func TestCloseRace(t *testing.T) {
 	mockSvc := &mockDynamoDBClient{}
@@ -65,27 +61,12 @@ func TestCloseRace(t *testing.T) {
 	n := runtime.NumCPU()
 	//n := 100
 
-	//wg.Add(1)
-	//go func() {
-	//	defer wg.Done()
-	//	// TODO: Create a ton of goroutines that acquire a lock
-	//	for i := 0; i < n; i++ {
-	//		wg.Add(1)
-	//		go func() {
-	//			defer wg.Done()
-	//			l, err := lockClient.AcquireLock(string(i))
-	//			if err != nil || l == nil {
-	//				t.Fatal("error acquiring lock")
-	//			}
-	//		}()
-	//	}
-	//}()
+	// Create goroutines that acquire a lock
 	for i := 0; i < n; i++ {
 		si := i
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			//lockClient.AcquireLock(string(i))
 			l, err := lockClient.AcquireLock(strconv.Itoa(si))
 			if err != nil {
 				t.Fatal("error acquiring lock" + err.Error())
@@ -93,34 +74,17 @@ func TestCloseRace(t *testing.T) {
 			if l == nil {
 				t.Fatal("no error but no lock")
 			}
-			//t.Fatal("unique id: " + l.uniqueIdentifier())
 		}()
 	}
 
-	wg.Wait()
-
-	wg.Add(1)
-	length2 := 0
-	go func() {
-		defer wg.Done()
-		lockClient.locks.Range(func(_, _ interface{}) bool {
-			length2++
-			return true
-		})
-	}()
-
-	wg.Wait()
-
-	//t.Fatal("lox="+strconv.Itoa(length2))
-
-	// TODO: Close the lock client
+	// Close the lock client
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		lockClient.Close()
 	}()
 
-	// TODO: Check for any leaked locks
+	// Check for any leaked locks
 	wg.Wait()
 	length := 0
 	lockClient.locks.Range(func(_, _ interface{}) bool {
@@ -130,15 +94,8 @@ func TestCloseRace(t *testing.T) {
 	})
 
 	if length > 0 {
-		t.Fatal("lock client still has locks after Close()")
+		t.Fatal("lock client still has " + strconv.Itoa(length) + " locks after Close()")
 	}
-	t.Fatal("pass: we have this many lox: " + strconv.Itoa(length) + " and numcpu=" + strconv.Itoa(n))
-	//for i := 0; i < n; i++ {
-	//	l, _ := lockClient.Get(string(i))
-	//	if l != nil {
-	//		t.Fatal("Leaked lock")
-	//	}
-	//}
 }
 
 func TestBadCreateLockItem(t *testing.T) {
