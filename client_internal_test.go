@@ -30,14 +30,18 @@ import (
 type mockDynamoDBClient struct {
 	dynamodbiface.DynamoDBAPI
 }
-//func (m *mockDynamoDBClient) PutItem(input *dynamodb.PutItemInput) (*dynamodb.PutItemOutput, error) {
-//	// TODO: Implement mock
-//	return &dynamodb.PutItemOutput{}, nil
-//}
-//func (m *mockDynamoDBClient) GetItem(input *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
-//	// TODO: Implement mock
-//	return &dynamodb.GetItemOutput{}, nil
-//}
+func (m *mockDynamoDBClient) PutItem(input *dynamodb.PutItemInput) (*dynamodb.PutItemOutput, error) {
+	// TODO: Implement mock
+	return &dynamodb.PutItemOutput{}, nil
+}
+func (m *mockDynamoDBClient) GetItem(input *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
+	// TODO: Implement mock
+	return &dynamodb.GetItemOutput{}, nil
+}
+func (m *mockDynamoDBClient) UpdateItem(input *dynamodb.UpdateItemInput) (*dynamodb.UpdateItemOutput, error) {
+	// TODO: Implement mock
+	return &dynamodb.UpdateItemOutput{}, nil
+}
 //func (m *mockDynamoDBClient) DeleteItem(input *dynamodb.DeleteItemInput) (*dynamodb.DeleteItemOutput, error) {
 //	// TODO: Implement mock
 //	return &dynamodb.DeleteItemOutput{}, nil
@@ -57,22 +61,56 @@ func TestCloseRace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	var wg sync.WaitGroup
 	n := runtime.NumCPU()
+	//n := 100
+
+	//wg.Add(1)
+	//go func() {
+	//	defer wg.Done()
+	//	// TODO: Create a ton of goroutines that acquire a lock
+	//	for i := 0; i < n; i++ {
+	//		wg.Add(1)
+	//		go func() {
+	//			defer wg.Done()
+	//			l, err := lockClient.AcquireLock(string(i))
+	//			if err != nil || l == nil {
+	//				t.Fatal("error acquiring lock")
+	//			}
+	//		}()
+	//	}
+	//}()
+	for i := 0; i < n; i++ {
+		si := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			//lockClient.AcquireLock(string(i))
+			l, err := lockClient.AcquireLock(strconv.Itoa(si))
+			if err != nil {
+				t.Fatal("error acquiring lock" + err.Error())
+			}
+			if l == nil {
+				t.Fatal("no error but no lock")
+			}
+			t.Fatal("unique id: " + l.uniqueIdentifier())
+		}()
+	}
 
 	wg.Add(1)
+	length2 := 0
 	go func() {
 		defer wg.Done()
-		// TODO: Create a ton of goroutines that acquire a lock
-		for i := 0; i < n; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				lockClient.AcquireLock(string(i))
-			}()
-		}
+		length2 := 0
+		lockClient.locks.Range(func(_, _ interface{}) bool {
+			length2++
+			return true
+		})
 	}()
+
+	wg.Wait()
+
+	t.Fatal("lox="+strconv.Itoa(length2))
 
 	// TODO: Close the lock client
 	wg.Add(1)
@@ -83,16 +121,17 @@ func TestCloseRace(t *testing.T) {
 
 	// TODO: Check for any leaked locks
 	wg.Wait()
-
 	length := 0
-
 	lockClient.locks.Range(func(_, _ interface{}) bool {
 		length++
 
 		return true
 	})
 
-	t.Fatal("we have this many lox: " + strconv.Itoa(length))
+	if length > 0 {
+		t.Fatal("lock client still has locks after Close()")
+	}
+	t.Fatal("pass: we have this many lox: " + strconv.Itoa(length) + " and numcpu=" + strconv.Itoa(n))
 	//for i := 0; i < n; i++ {
 	//	l, _ := lockClient.Get(string(i))
 	//	if l != nil {
