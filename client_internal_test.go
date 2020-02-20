@@ -40,6 +40,11 @@ func (m *mockDynamoDBClient) UpdateItem(input *dynamodb.UpdateItemInput) (*dynam
 	return &dynamodb.UpdateItemOutput{}, nil
 }
 
+/*
+This test checks for lock leaks during closing, that is, to make sure that no locks
+are able to be acquired while the client is closing, and to ensure that we don't have
+any locks in the internal lock map after a client is closed.
+ */
 func TestCloseRace(t *testing.T) {
 	mockSvc := &mockDynamoDBClient{}
 
@@ -53,8 +58,9 @@ func TestCloseRace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	var wg sync.WaitGroup
-	n := 100
+	n := 500
 
 	// Create goroutines that acquire a lock
 	for i := 0; i < n; i++ {
