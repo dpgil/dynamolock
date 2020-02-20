@@ -31,22 +31,19 @@ type mockDynamoDBClient struct {
 	dynamodbiface.DynamoDBAPI
 }
 func (m *mockDynamoDBClient) PutItem(input *dynamodb.PutItemInput) (*dynamodb.PutItemOutput, error) {
-	// TODO: Implement mock
 	return &dynamodb.PutItemOutput{}, nil
 }
 func (m *mockDynamoDBClient) GetItem(input *dynamodb.GetItemInput) (*dynamodb.GetItemOutput, error) {
-	// TODO: Implement mock
 	return &dynamodb.GetItemOutput{}, nil
 }
 func (m *mockDynamoDBClient) UpdateItem(input *dynamodb.UpdateItemInput) (*dynamodb.UpdateItemOutput, error) {
-	// TODO: Implement mock
 	return &dynamodb.UpdateItemOutput{}, nil
 }
 
 func TestCloseRace(t *testing.T) {
 	mockSvc := &mockDynamoDBClient{}
 
-	// TODO: Most of the input into New isn't relevant since we're mocking
+	// Most of the input into New isn't relevant since we're mocking
 	lockClient, err := New(mockSvc, "locksCloseRace",
 		WithLeaseDuration(3*time.Second),
 		WithHeartbeatPeriod(100*time.Millisecond),
