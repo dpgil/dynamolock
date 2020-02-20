@@ -53,7 +53,6 @@ func TestCloseRace(t *testing.T) {
 		WithOwnerName("CloseRace"),
 		WithPartitionKeyName("key"),
 	)
-	//lockClient := &Client{}
 	if err != nil {
 		t.Fatal(err)
 	}
