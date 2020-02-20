@@ -17,14 +17,14 @@ limitations under the License.
 package dynamolock_test
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"golang.org/x/xerrors"
 	"sync"
 	"testing"
 	"time"
 
 	"cirello.io/dynamolock"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"golang.org/x/xerrors"
 )
 
 func TestIssue56(t *testing.T) {
