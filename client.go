@@ -775,30 +775,7 @@ func (c *Client) ReleaseLock(lockItem *Lock, opts ...ReleaseLockOption) (bool, e
 	if c.isClosed() {
 		return false, ErrClientClosed
 	}
-	releaseLockOptions := &releaseLockOptions{
-		lockItem: lockItem,
-	}
-	if lockItem != nil {
-		releaseLockOptions.deleteLock = lockItem.deleteLockOnRelease
-	}
-	for _, opt := range opts {
-		opt(releaseLockOptions)
-	}
-	err := c.releaseLock(releaseLockOptions)
-	return err == nil, err
-}
-
-func (c *Client) ReleaseLockSkipCheck(lockItem *Lock, opts ...ReleaseLockOption) (bool, error) {
-	releaseLockOptions := &releaseLockOptions{
-		lockItem: lockItem,
-	}
-	if lockItem != nil {
-		releaseLockOptions.deleteLock = lockItem.deleteLockOnRelease
-	}
-	for _, opt := range opts {
-		opt(releaseLockOptions)
-	}
-	err := c.releaseLock(releaseLockOptions)
+	err := c.releaseLock(lockItem, opts...)
 	return err == nil, err
 }
 
@@ -825,8 +802,17 @@ func WithDataAfterRelease(data []byte) ReleaseLockOption {
 // during the act of releasing a lock.
 type ReleaseLockOption func(*releaseLockOptions)
 
-func (c *Client) releaseLock(options *releaseLockOptions) error {
-	lockItem := options.lockItem
+func (c *Client) releaseLock(lockItem *Lock, opts ...ReleaseLockOption) error {
+	options := &releaseLockOptions{
+		lockItem: lockItem,
+	}
+	if lockItem != nil {
+		options.deleteLock = lockItem.deleteLockOnRelease
+	}
+	for _, opt := range opts {
+		opt(options)
+	}
+
 	if lockItem == nil {
 		return ErrCannotReleaseNullLock
 	}
@@ -903,7 +889,7 @@ func (c *Client) releaseLock(options *releaseLockOptions) error {
 func (c *Client) releaseAllLocks() error {
 	var err error
 	c.locks.Range(func(key interface{}, value interface{}) bool {
-		_, err = c.ReleaseLockSkipCheck(value.(*Lock))
+		err = c.releaseLock(value.(*Lock))
 		return err == nil
 	})
 	return err
